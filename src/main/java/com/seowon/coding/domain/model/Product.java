@@ -12,6 +12,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Entity
 @Data
@@ -54,4 +55,12 @@ public class Product {
         }
         stockQuantity += quantity;
     }
+
+    public void validIds(List<Long> productIds){
+        if (productIds == null || productIds.isEmpty()) {
+            throw new IllegalArgumentException("empty productIds");
+        }
+    }
+
+
 }

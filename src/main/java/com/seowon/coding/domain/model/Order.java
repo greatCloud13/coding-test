@@ -1,6 +1,9 @@
 package com.seowon.coding.domain.model;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -22,9 +25,13 @@ public class Order {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
+
+    @NotNull(message = "customer info required")
+    @NotBlank(message = "customer info required")
     private String customerName;
-    
+
+    @NotNull(message = "customer info required")
+    @NotBlank(message = "customer info required")
     private String customerEmail;
     
     @Enumerated(EnumType.STRING)
@@ -34,6 +41,8 @@ public class Order {
     
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
+    @NotEmpty(message = "orderReqs invalid")
+    @NotNull(message = "orderReqs invalid")
     private List<OrderItem> items = new ArrayList<>();
     
     private BigDecimal totalAmount;
@@ -76,4 +85,6 @@ public class Order {
     public enum OrderStatus {
         PENDING, PROCESSING, SHIPPED, DELIVERED, CANCELLED
     }
+
+
 }
