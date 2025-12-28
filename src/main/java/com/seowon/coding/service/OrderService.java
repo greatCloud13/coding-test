@@ -7,12 +7,14 @@ import com.seowon.coding.domain.model.Product;
 import com.seowon.coding.domain.repository.OrderRepository;
 import com.seowon.coding.domain.repository.ProcessingStatusRepository;
 import com.seowon.coding.domain.repository.ProductRepository;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -54,7 +56,7 @@ public class OrderService {
     }
 
 
-
+    @Transactional
     public Order placeOrder(String customerName, String customerEmail, List<Long> productIds, List<Integer> quantities) {
         // TODO #3: 구현 항목
         // * 주어진 고객 정보로 새 Order를 생성
@@ -64,7 +66,36 @@ public class OrderService {
         // * order 를 저장
         // * 각 Product 의 재고를 수정
         // * placeOrder 메소드의 시그니처는 변경하지 않은 채 구현하세요.
-        return null;
+
+        List<OrderItem> items = new ArrayList<>();
+        Product product;
+        int quantitiesIndex = 0;
+
+        Order order = Order.builder()
+                .customerName(customerName)
+                .customerEmail(customerEmail)
+                .status(Order.OrderStatus.PENDING)
+                .orderDate(LocalDateTime.now())
+                .items(items)
+                .build();
+
+        for(Long id : productIds){
+            product = productRepository.findById(id)
+                            .orElseThrow(() -> new IllegalArgumentException("Product not found: " + id));
+
+            items.add(OrderItem.builder()
+                            .order(order)
+                            .product(product)
+                            .quantity(quantities.get(quantitiesIndex))
+                            .price(order.getTotalAmount())
+                    .build()
+            );
+
+            product.decreaseStock(quantities.get(quantitiesIndex));
+            quantitiesIndex++;
+        }
+
+        return orderRepository.save(order);
     }
 
     /**
@@ -76,12 +107,18 @@ public class OrderService {
                                String customerEmail,
                                List<OrderProduct> orderProducts,
                                String couponCode) {
+
+        /*
         if (customerName == null || customerEmail == null) {
             throw new IllegalArgumentException("customer info required");
         }
+        */
+
+        /*
         if (orderProducts == null || orderProducts.isEmpty()) {
             throw new IllegalArgumentException("orderReqs invalid");
         }
+         */
 
         Order order = Order.builder()
                 .customerName(customerName)
@@ -127,19 +164,26 @@ public class OrderService {
         return orderRepository.save(order);
     }
 
-    /**
+    /*
      * TODO #5: 코드 리뷰 - 장시간 작업과 진행률 저장의 트랜잭션 분리
      * - 시나리오: 일괄 배송 처리 중 진행률을 저장하여 다른 사용자가 조회 가능해야 함.
      * - 리뷰 포인트: proxy 및 transaction 분리, 예외 전파/롤백 범위, 가독성 등
      * - 상식적인 수준에서 요구사항(기획)을 가정하며 최대한 상세히 작성하세요.
-     */
+
+     * @Transactional 어노테이션의 경우 프록시 객체를 생성후 사용되는데
+     * 같은 클래스 내부의 메소드를 호출할경우 해당 메소드의 경우 this.~ 로 직접 호출되기 때문에
+     * @Transactional이 동작하지 않는다
+
     @Transactional
     public void bulkShipOrdersParent(String jobId, List<Long> orderIds) {
         ProcessingStatus ps = processingStatusRepository.findByJobId(jobId)
                 .orElseGet(() -> processingStatusRepository.save(ProcessingStatus.builder().jobId(jobId).build()));
+                // 진행정보 가져옴
         ps.markRunning(orderIds == null ? 0 : orderIds.size());
+        // 주문 id가 없으면 진행 상태를 0으로 변경, 있을 경우 진행중인 order의 total을 수정
         processingStatusRepository.save(ps);
 
+*
         int processed = 0;
         for (Long orderId : (orderIds == null ? List.<Long>of() : orderIds)) {
             try {
@@ -154,13 +198,46 @@ public class OrderService {
         ps.markCompleted();
         processingStatusRepository.save(ps);
     }
+    */
 
+    /**
+     * 선택한 주문들의 배송 상태 진행중으로 변경
+     * @param jobId
+     * @param orderIds
+     * @return
+     */
+    @Transactional
+    public ProcessingStatus processingSetRunning(String jobId, List<Long> orderIds){
+        ProcessingStatus ps = processingStatusRepository.findByJobId(jobId)
+                .orElseGet(() -> processingStatusRepository.save(ProcessingStatus.builder().jobId(jobId).build()));
+        ps.markRunning(orderIds == null ? 0 : orderIds.size());
+        return processingStatusRepository.save(ps);
+    }
+
+    /**
+     * 선택한 작업의 배송 상태 업데이트
+     * @param jobId
+     * @param processed
+     * @param total
+     * @param orderIds
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void updateProgressRequiresNew(String jobId, int processed, int total) {
+    public ProcessingStatus updateProgressRequiresNew(String jobId, int processed, int total, List<Long> orderIds) {
         ProcessingStatus ps = processingStatusRepository.findByJobId(jobId)
                 .orElseGet(() -> ProcessingStatus.builder().jobId(jobId).build());
+
+        for (Long orderId : (orderIds == null ? List.<Long>of() : orderIds)) {
+            try {
+                // 오래 걸리는 작업 이라는 가정 시뮬레이션 (예: 외부 시스템 연동, 대용량 계산 등)
+                orderRepository.findById(orderId).ifPresent(o -> o.setStatus(Order.OrderStatus.PROCESSING));
+                // 중간 진행률 저장
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+
         ps.updateProgress(processed, total);
-        processingStatusRepository.save(ps);
+        return processingStatusRepository.save(ps);
     }
 
 }
