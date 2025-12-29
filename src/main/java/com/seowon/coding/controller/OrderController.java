@@ -39,13 +39,19 @@ public class OrderController {
 
     @PostMapping
     public ResponseEntity<Order> createOrder(@RequestBody OrderCreateDto orderRequest){
-        Order order = orderService.placeOrder(
-                orderRequest.getCustomerName(),
-                orderRequest.getCustomerEmail(),
-                orderRequest.getProductIds(),
-                orderRequest.getQuantities());
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(order);
+        try{
+            Order order = orderService.placeOrder(
+                    orderRequest.getCustomerName(),
+                    orderRequest.getCustomerEmail(),
+                    orderRequest.getProductIds(),
+                    orderRequest.getQuantities()
+            );
+
+            return ResponseEntity.status(HttpStatus.CREATED).body(order);
+        }catch (RuntimeException e){
+            return ResponseEntity.badRequest().build();
+        }
     }
 
     @GetMapping
