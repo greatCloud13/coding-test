@@ -18,9 +18,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -69,41 +67,32 @@ public class OrderService {
         // * 각 Product 의 재고를 수정
         // * placeOrder 메소드의 시그니처는 변경하지 않은 채 구현하세요.
 
+        List<OrderItem> items = new ArrayList<>();
+        Product product;
+        int quantitiesIndex = 0;
+
         Order order = Order.builder()
                 .customerName(customerName)
                 .customerEmail(customerEmail)
                 .status(Order.OrderStatus.PENDING)
                 .orderDate(LocalDateTime.now())
+                .items(items)
                 .build();
 
-        List<Product> productList = productRepository.findAllById(productIds);
+        for(Long id : productIds){
+            product = productRepository.findById(id)
+                            .orElseThrow(() -> new IllegalArgumentException("Product not found: " + id));
 
-        if(productList.size() != quantities.size()){
-            throw new IllegalArgumentException("존재하지 않는 상품이 포함되어 있습니다.");
-        }
-
-        // DB에서 반환되는 순서는 보장되지 않기에 Map 활용 해야한다.
-        Map<Long, Product> productMap = productList.stream()
-                .collect(Collectors.toMap(Product::getId, Product ->Product));
-
-        for(int i = 0; i<productIds.size(); i++){
-            Long productId = productIds.get(i);
-            Integer quantity = quantities.get(i);
-            Product product = productMap.get(productId);
-
-            if (product == null){
-                throw new IllegalArgumentException("존재하지 않는 상품입니다"+productId);
-            }
-
-            product.decreaseStock(quantity);
-            OrderItem orderItem = OrderItem.builder()
+            items.add(OrderItem.builder()
                             .order(order)
                             .product(product)
-                            .quantity(quantity)
-                            .price(product.getPrice().multiply(BigDecimal.valueOf(quantities.get(i))))
-                            .build();
+                            .quantity(quantities.get(quantitiesIndex))
+                            .price(order.getTotalAmount())
+                    .build()
+            );
 
-            order.addItem(orderItem);
+            product.decreaseStock(quantities.get(quantitiesIndex));
+            quantitiesIndex++;
         }
 
         return orderRepository.save(order);
