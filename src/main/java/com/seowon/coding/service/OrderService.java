@@ -67,32 +67,38 @@ public class OrderService {
         // * 각 Product 의 재고를 수정
         // * placeOrder 메소드의 시그니처는 변경하지 않은 채 구현하세요.
 
-        List<OrderItem> items = new ArrayList<>();
-        Product product;
-        int quantitiesIndex = 0;
-
+        // Order 생성
         Order order = Order.builder()
                 .customerName(customerName)
                 .customerEmail(customerEmail)
                 .status(Order.OrderStatus.PENDING)
                 .orderDate(LocalDateTime.now())
-                .items(items)
                 .build();
 
-        for(Long id : productIds){
-            product = productRepository.findById(id)
-                            .orElseThrow(() -> new IllegalArgumentException("Product not found: " + id));
+        List<Product> productList = productRepository.findAllById(productIds);
 
-            items.add(OrderItem.builder()
-                            .order(order)
-                            .product(product)
-                            .quantity(quantities.get(quantitiesIndex))
-                            .price(order.getTotalAmount())
-                    .build()
-            );
+        Map<Long, Product> productMap = productList.stream()
+                .collect(Collectors.toMap(Product::getId, product->product));
 
-            product.decreaseStock(quantities.get(quantitiesIndex));
-            quantitiesIndex++;
+        if(productList.size() != quantities.size()){
+            throw new IllegalArgumentException("선택한 상품의 정보가 올바르지 않습니다");
+        }
+
+        for(int i = 0; i<productIds.size(); i++){
+            Long productId = productIds.get(i);
+            Integer quantity = quantities.get(i);
+
+            Product product = productMap.get(productId);
+            product.decreaseStock(quantity);
+
+            OrderItem orderItem = OrderItem.builder()
+                    .order(order)
+                    .product(product)
+                    .quantity(quantity)
+                    .price(product.getPrice())
+                    .build();
+
+            order.addItem(orderItem);
         }
 
         return orderRepository.save(order);
