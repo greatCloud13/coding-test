@@ -4,7 +4,6 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -24,12 +23,12 @@ public class Product {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
-    @NotBlank(message = "Product name is required")
+
+
     private String name;
     
     private String description;
-    
+
     @Positive(message = "Price must be positive")
     private BigDecimal price;
     
@@ -43,6 +42,10 @@ public class Product {
     }
     
     public void decreaseStock(int quantity) {
+
+        if (quantity <= 0) {
+            throw new IllegalArgumentException("quantity must be positive: " + quantity);
+        }
         if (quantity > stockQuantity) {
             throw new IllegalArgumentException("Not enough stock available");
         }
@@ -54,6 +57,11 @@ public class Product {
             throw new IllegalArgumentException("Quantity must be positive");
         }
         stockQuantity += quantity;
+    }
+
+
+    public BigDecimal getSubtotal(Integer qty){
+        return price.multiply(BigDecimal.valueOf(qty));
     }
 
     public void validIds(List<Long> productIds){
