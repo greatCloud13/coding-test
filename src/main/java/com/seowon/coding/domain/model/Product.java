@@ -11,6 +11,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 
 @Entity
@@ -19,17 +20,17 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class Product {
+
+    private static final BigDecimal HUNDRED = new BigDecimal("100");
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-
     private String name;
     
     private String description;
 
-    @Positive(message = "Price must be positive")
     private BigDecimal price;
     
     private int stockQuantity;
@@ -68,6 +69,23 @@ public class Product {
         if (productIds == null || productIds.isEmpty()) {
             throw new IllegalArgumentException("empty productIds");
         }
+    }
+
+    public void priceChange(BigDecimal percentage, BigDecimal vat, boolean includeTax){
+        BigDecimal base = getPrice() == null ? BigDecimal.ZERO : getPrice();
+
+
+        BigDecimal changeRate = percentage.divide(HUNDRED, 4, RoundingMode.HALF_UP);
+
+        BigDecimal changed = base.add(base.multiply(changeRate));
+
+        if(includeTax){
+            changed = changed.multiply(vat);
+        }
+
+        BigDecimal newPrice = changed.setScale(2, RoundingMode.HALF_UP);
+
+        setPrice(newPrice);
     }
 
 
