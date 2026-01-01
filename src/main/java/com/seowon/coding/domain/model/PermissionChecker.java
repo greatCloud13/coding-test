@@ -1,8 +1,10 @@
 package com.seowon.coding.domain.model;
 
 
+import com.seowon.coding.util.ListFun;
 import lombok.Builder;
 
+import java.util.HashMap;
 import java.util.List;
 
 class PermissionChecker {
@@ -19,24 +21,27 @@ class PermissionChecker {
             List<UserGroup> groups,
             List<Policy> policies
     ) {
-        for (User user : users) {
-            if (user.id.equals(userId)) {
-                for (String groupId : user.groupIds) {
-                    for (UserGroup group : groups) {
-                        if (group.id.equals(groupId)) {
-                            for (String policyId : group.policyIds) {
-                                for (Policy policy : policies) {
-                                    if (policy.id.equals(policyId)) {
-                                        for (Statement statement : policy.statements) {
-                                            if (statement.actions.contains(targetAction) &&
-                                                statement.resources.contains(targetResource)) {
-                                                return true;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
+
+        // 1. 탐색 전  HashMap으로 변환 O(1);
+        HashMap<String, User> userHashMap = ListFun.toHashMap(users, (User user) -> {return user.id;});
+        HashMap<String, UserGroup> userGroupHashMap = ListFun.toHashMap(groups, (UserGroup userGroup) -> {return userGroup.id;});
+        HashMap<String, Policy> policyHashMap = ListFun.toHashMap(policies, (Policy policy) ->{return policy.id;});
+
+        // O(g*p*s)
+        User user = userHashMap.get(userId);
+        if (user == null){
+            return false;
+        }
+        for(String userGroupId : user.groupIds){                    //O(g)
+            UserGroup userGroup = userGroupHashMap.get(userGroupId);
+            if(userGroup == null) continue;
+            for(String policyId : userGroup.policyIds){             //O(p)
+                Policy policy = policyHashMap.get(policyId);
+                if(policy == null) continue;
+                for(Statement statement : policy.statements){       // O(s)
+                    if (statement.actions.contains(targetAction) &&
+                            statement.resources.contains(targetResource)) {
+                        return true;
                     }
                 }
             }
